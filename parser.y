@@ -227,11 +227,10 @@ Aff : tId tEqu E		{ajout_init($1);
 							add_instr2("","","");}
 	;
 Print : tPrint tPo tId tPf tPv	{char* buf = malloc(5); char* buf2 = malloc(5) ;  
-				  							sprintf(buf, "%d", find_sym($1)); 
+				  							sprintf(buf, "%d", find_sym($3)); 
 											add_instr2("LOAD", "R0",buf) ; ajout_tmp();
 											sprintf(buf2, "%d", tab_sym[tmp].adr);  
-											add_instr2("STORE", buf2, "R0"); 
-											$$=tab_sym[tmp].adr;}
+											add_instr2("PRI", buf2, "R0"); }
 	  ;
 Return : tRet tNb tPv 
 	   ;
