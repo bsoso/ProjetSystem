@@ -39,6 +39,7 @@ void ajout_sym_init(char* var){
 	}
 }
 
+//retourne l'index de la variable recherchée
 int find_sym(char * var){
 	int i, adr = -1;
 	int test = -1;
