@@ -226,7 +226,7 @@ Aff : tId tEqu E		{ajout_init($1);
 							add_instr2("STORE", buf2, "R0");
 							add_instr2("","","");}
 	;
-	//Sohun, elle a tout fait
+
 Print : tPrint tPo tId tPf tPv	{char* buf = malloc(5); char* buf2 = malloc(5) ;  
 				  							sprintf(buf, "%d", find_sym($3)); 
 											add_instr2("LOAD", "R0",buf) ; ajout_tmp();
