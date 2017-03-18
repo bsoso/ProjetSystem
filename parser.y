@@ -121,14 +121,14 @@ void free_all(){
 %union 	{int nb; char* str;};
 %token 	tInclude tMain tIf tElse tWhile tAo tAf tPo tPf tPv tEqu tVir tStar tPlus tMinus tRet tInt tEquEqu tAnd tOr tConst blancs lettre chiffre tPrint tCo tCf tDot tDiv tNot tInf tSup tInfEqu tSupEqu
 %token	<nb>	tNb
-%token	<str> tId
-%type		<nb>  tAo
-%type		<nb>	E
-%left		tOr tAnd
+%token	<str> 	tId
+%type	<nb> 	tAo
+%type	<nb>	E
+%left	tOr tAnd
 %right	tEquEqu
-%left		tPlus tMinus
-%left		tDiv tStar
-%left		tPo tPf
+%left	tPlus tMinus
+%left	tDiv tStar
+%left	tPo tPf
 %right	tEqu
 %start	Prog						
 
@@ -139,9 +139,9 @@ Prog : Main
 Fonctions : Fonction Fonctions
 		  	| /*empty*/ 
 			;
-Fonction : tInt tId tPo Args tPf Body
+Fonction : tInt tId tPo Args tPf RBody
 		 ;
-Main : tInt tMain tPo tPf Body		 
+Main : tInt tMain tPo tPf RBody		 
      ;
 Args : tInt tId ArgsN
 	 	|  /*empty*/ 
@@ -149,7 +149,7 @@ Args : tInt tId ArgsN
 ArgsN :	tVir tInt tId ArgsN
 	  	|  /*empty*/ 
 		;
-Body : tAo {$1 = sym;} Instrs Return {sym = $1;} tAf
+RBody : tAo {$1 = getSym(); printf("$1 = %d\n", $1);} Instrs Return {setSym($1);} tAf
 	 ;
 Instrs : Aff tPv Instrs 
 	   | Invoc tPv Instrs 
@@ -159,11 +159,6 @@ Instrs : Aff tPv Instrs
 		| Print Instrs 
 		| /*empty*/
 	   	;
-If : tIf tPo E tPf Body Else
-	;
-Else : tElse Body 
-	 	| /*empty*/
-		;
 E :  tId					{char* buf = malloc(5); char* buf2 = malloc(5) ;  
   							sprintf(buf, "%d", find_sym($1)); 
 							if (tab_sym[find_sym($1)].init == 1){ 
@@ -194,8 +189,14 @@ E :  tId					{char* buf = malloc(5); char* buf2 = malloc(5) ;
 	| E tStar E				{add_instruction("MUL", $1, $3); $$=tab_sym[tmp].adr; }		
 	| E tDiv E				{add_instruction("DIV", $1, $3); $$=tab_sym[tmp].adr; }	
 	;	
+If : tIf tPo E tPf Body Else
+	;
+Else : tElse Body 
+	 	| /*empty*/
+		;
 While : tWhile tPo E tPf Body	
 	  ;	
+Body : tAo {printf("Début de body if et while\n");$1 = getSym(); printf("$1 = %d\n", $1);} Instrs {setSym($1);} tAf {printf("Je suis à la fin de Body\n");}
 Invoc : tId tPo Params tPf	
 	  ;
 Params : E ParamsN
@@ -211,7 +212,8 @@ Decl1 : tId 	 			{ajout_sym($1);printf("sym = %d   var stockée = %s\n",sym, tab
 	  	| tId tEqu E		{ajout_sym_init($1);
 								char* buf = malloc(5); char* buf2 = malloc(5);
 								sprintf(buf, "%d", $3);
-								add_instr2("LOAD", "R0", buf); free_last_tmp();
+								add_instr2("LOAD", "R0", buf);
+								free_last_tmp();
 								sprintf(buf2, "%d", find_sym($1));
 								add_instr2("STORE", buf2, "R0");}
 		;
