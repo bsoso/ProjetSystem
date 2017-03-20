@@ -3,11 +3,12 @@
 #include <stdio.h>
 #include "tab_symboles.h"
 #include <string.h>
+#include "tab_fonctions.h"
 
 void yyerror(char *s);
 int yylex(void);
 
-//table des instructions
+//table des instructions 
 char* instr[256][4];
 int ip = 0;
 
@@ -37,6 +38,18 @@ void add_instr2(char* op, char* opr1, char* opr2){
 	}
 }
 
+void add_instr1(char* op, char* opr){
+	char buf1[5];
+	if (ip < 256) {
+		instr[ip][0] = op;
+		instr[ip][1] = opr;
+		ip++;
+	} else {
+		printf("Erreur ! Overflow table instructions ! \n");
+		exit(1);
+	}
+}
+
 void add_instruction(char* op, int s1, int s3){
 	char* buf = malloc(5); 
 	char* buf2 = malloc(5); 
@@ -51,6 +64,19 @@ void add_instruction(char* op, int s1, int s3){
 	ajout_tmp(); 
 	sprintf(buf3, "%d", tab_sym[tmp].adr);
 	add_instr2("STORE", buf3, "R0"); 
+}
+
+void add_tId(char* s1){
+	char* buf = malloc(5); char* buf2 = malloc(5) ;  
+	sprintf(buf, "%d", find_sym(s1)); 
+	if (tab_sym[find_sym(s1)].init == 1){ 
+		add_instr2("LOAD", "R0",buf) ; ajout_tmp();
+		sprintf(buf2, "%d", tab_sym[tmp].adr);  
+		add_instr2("STORE", buf2, "R0"); 
+	} else {
+		printf("Erreur ! Variable non initialisée !\n");
+		exit(1);
+	};
 }
 
 /* Print du tableau (Test)*/
@@ -121,17 +147,16 @@ void free_all(){
 %union 	{int nb; char* str;};
 %token 	tInclude tMain tIf tElse tWhile tAo tAf tPo tPf tPv tEqu tVir tStar tPlus tMinus tRet tInt tEquEqu tAnd tOr tConst blancs lettre chiffre tPrint tCo tCf tDot tDiv tNot tInf tSup tInfEqu tSupEqu
 %token	<nb>	tNb
-%token	<str> 	tId
-%type	<nb> 	tAo
-%type	<nb>	tPo
-%type	<nb>	tPf
-%type	<nb>	E
-//%type	<nb>	Else
-%left	tOr tAnd
+%token	<str> tId
+%type 	<str>	tMain
+%type		<nb> 	tAo
+%type		<nb>	tPo
+%type		<nb>	E
+%left		tOr tAnd
 %right	tEquEqu
-%left	tPlus tMinus
-%left	tDiv tStar
-%left	tPo tPf
+%left		tPlus tMinus
+%left		tDiv tStar
+%left		tPo tPf
 %right	tEqu
 %start	Prog						
 
@@ -142,14 +167,16 @@ Prog : Main
 Fonctions : Fonction Fonctions
 		  	| /*empty*/ 
 			;
-Fonction : tInt tId tPo {$3 = getSym();}Args tPf RBody
+Fonction : tInt tId tPo {ajout_fonc($2); $3 = getSym(); /*on garde indice TS*/}
+				Args {/*ajout_nbArgs($2);*/} tPf 
+				RBody {setSym($3); /*Reset TS*/}
 		 ;
-Main : tInt tMain tPo tPf RBody		 
+Main : tInt tMain {ajout_fonc($2);} tPo tPf RBody		 
      ;
-Args : tInt tId ArgsN
+Args : tInt tId {add_tId($2); /*-------------------Voir comment incrementer le nombre d'argument avec le nom de la fonction*/} ArgsN 
 	 	|  /*empty*/ 
 		;
-ArgsN :	tVir tInt tId ArgsN
+ArgsN :	tVir tInt tId {add_tId($3); /*---------------------------voir comment incrementer le nombre d'argument avec le nom de la fonction*/} ArgsN 
 	  	|  /*empty*/ 
 		;
 RBody : tAo {$1 = getSym(); printf("$1 = %d\n", $1);} Instrs Return {setSym($1);} tAf
@@ -162,17 +189,7 @@ Instrs : Aff tPv Instrs
 		| Print Instrs 
 		| /*empty*/
 	   	;
-E :  tId					{char* buf = malloc(5); char* buf2 = malloc(5) ;  
-  							sprintf(buf, "%d", find_sym($1)); 
-							if (tab_sym[find_sym($1)].init == 1){ 
-								add_instr2("LOAD", "R0",buf) ; ajout_tmp();
-								sprintf(buf2, "%d", tab_sym[tmp].adr);  
-								add_instr2("STORE", buf2, "R0"); 
-								$$=tab_sym[tmp].adr;
-							} else {
-								printf("Erreur ! Variable non initialisée !\n");
-								exit(1);
-							};}
+E :  tId					{add_tId($1); $$=tab_sym[tmp].adr;}
   	
 	| tNb					{char* buf = malloc(5); char* buf2 = malloc(5) ; 
 							sprintf(buf, "%d", $1); 
@@ -193,48 +210,22 @@ E :  tId					{char* buf = malloc(5); char* buf2 = malloc(5) ;
 	| E tDiv E				{add_instruction("DIV", $1, $3); $$=tab_sym[tmp].adr; }	
 	;	
 If : tIf tPo E tPf 
-   							{$2=ip; 
-							add_instr2("JMPC","","R0");}
+   							{$2=ip; add_instr2("JZ","","");}
 	Body 
 							{char* buf = malloc(5);
-							sprintf(buf, "%d", ip+2);
-							instr[$2][1]=buf;
-							$2=ip;
-							add_instr2("JMP","","");}
-
-	Else					{char* buf = malloc(5);
-							sprintf(buf, "%d", ip+1);
-							instr[$2][1]=buf;
-							;}
+							sprintf(buf, "%d", ip);
+							instr[$2][1]=buf;}
+	Else
 	;
 Else : tElse Body 
 	 	| /*empty*/
 		;
-While : tWhile tPo			{$2=ip;}
-	  	E tPf 				{$4=ip; add_instr2("JMPC","","R0");}
-		Body	
-							{char* buf = malloc(5);
-							sprintf(buf, "%d", ip+2);
-							printf("Valeur de ip ici : %d\n", ip);
-							printf("valeur de $4 ici : %d\n", $4);
-							instr[$4][1]=buf;
-							add_instr2("JMP","","");
-							char* buf1 = malloc(5);
-							sprintf(buf1, "%d", $2);
-							printf("Valeur de ip LA : %d\n", ip);
-							printf("valeur de $2 LA : %d\n", $2);
-
-							instr[ip-1][1]=buf1;}
+While : tWhile tPo E tPf Body	
 	  ;	
-Body : tAo 					{printf("Début de body if et while\n");
-	 							$1 = getSym(); 
-								printf("$1 = %d\n", $1);} 
-	 	Instrs 				{setSym($1);} 
-		tAf 				{printf("Je suis à la fin de Body\n");}
-	 ;
-Invoc : tId tPo Params tPf	
+Body : tAo {printf("Début de body if et while\n");$1 = getSym(); printf("$1 = %d\n", $1);} 			Instrs {setSym($1);} tAf {printf("Je suis à la fin de Body\n");}
+Invoc : tId {/*--------------------int i = ip;*/} tPo Params tPf {/*---------------------------------gerer le jump pour retourner au main  JMP Ri*/}	
 	  ;
-Params : E ParamsN
+Params : E ParamsN	/*------------------------------------------------Est-ce que c'est la qu'on ajoute les params dans la TS?*/
 	   	| /*empty*/ 
 		;
 ParamsN : tVir E ParamsN
@@ -243,7 +234,6 @@ ParamsN : tVir E ParamsN
 Decl : tInt Decl1	Decln
 		;
 Decl1 : tId 	 			{ajout_sym($1);printf("sym = %d   var stockée = %s\n",sym, tab_sym[sym].id);}
-
 	  	| tId tEqu E		{ajout_sym_init($1);
 								char* buf = malloc(5); char* buf2 = malloc(5);
 								sprintf(buf, "%d", $3);
@@ -260,8 +250,8 @@ Aff : tId tEqu E		{ajout_init($1);
 							sprintf(buf, "%d", $3);
 							add_instr2("LOAD", "R0", buf); free_last_tmp();
 							sprintf(buf2, "%d", find_sym($1));
-							add_instr2("STORE", buf2, "R0");}
-							//add_instr2("","","");}
+							add_instr2("STORE", buf2, "R0");
+							add_instr2("","","");}
 	;
 
 Print : tPrint tPo tId tPf tPv	{char* buf = malloc(5); char* buf2 = malloc(5) ;  
